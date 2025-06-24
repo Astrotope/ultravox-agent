@@ -28,10 +28,15 @@ router.post('/ultravox',
   asyncHandler(webhookController.handleUltravoxWebhook.bind(webhookController))
 );
 
-// Twilio webhook endpoint
+// Twilio status webhook endpoint (returns JSON)
 router.post('/twilio', 
   validateBody(twilioWebhookSchema),
   asyncHandler(webhookController.handleTwilioWebhook.bind(webhookController))
+);
+
+// Twilio voice webhook endpoint (returns TwiML XML)
+router.post('/twilio/voice', 
+  asyncHandler(webhookController.handleTwilioVoiceWebhook.bind(webhookController))
 );
 
 export default router;
