@@ -1,0 +1,56 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Booking {
+  id                   String        @id @default(cuid())
+  confirmationCode     String        @unique @db.VarChar(3)
+  customerName         String        @db.VarChar(100)
+  phone                String?       @db.VarChar(20)
+  date                 String        @db.VarChar(10) // YYYY-MM-DD format
+  time                 String        @db.VarChar(10) // e.g., "7:30 PM"
+  partySize            Int
+  specialRequirements  String?       @db.Text
+  status               BookingStatus @default(CONFIRMED)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@map("bookings")
+}
+
+model CallLog {
+  id              String     @id @default(cuid())
+  twilioCallSid   String     @unique
+  ultravoxCallId  String?
+  status          CallStatus @default(CONNECTING)
+  startedAt       DateTime   @default(now())
+  endedAt         DateTime?
+  duration        Int?       // seconds
+  endReason       String?
+  customerPhone   String?    @db.VarChar(20)
+  
+  @@map("call_logs")
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum CallStatus {
+  CONNECTING
+  ACTIVE
+  ENDED
+  FAILED
+}
