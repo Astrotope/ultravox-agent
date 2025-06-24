@@ -62,6 +62,17 @@ export function createApp(): Express {
   // Request middleware
   app.use(correlationIdMiddleware);
   app.use(requestLoggingMiddleware);
+  
+  // Add performance monitoring middleware from logging module
+  const { performanceMonitoringMiddleware, rateLimitLoggingMiddleware, debugRequestMiddleware } = require('./middleware/logging.middleware');
+  app.use(performanceMonitoringMiddleware);
+  app.use(rateLimitLoggingMiddleware);
+  
+  // Add debug request middleware for development
+  if (process.env.NODE_ENV === 'development') {
+    app.use(debugRequestMiddleware);
+  }
+  
   app.use(requestTimeout(30000)); // 30 second timeout
 
   // Health check endpoints

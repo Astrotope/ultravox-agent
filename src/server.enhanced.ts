@@ -21,29 +21,54 @@ async function main(): Promise<void> {
     // Start server with graceful shutdown
     const { server, shutdown } = await startServer();
 
-    logger.info('🚀 Restaurant Voice Agent Server is ready!', {
+    // Log startup completion with environment info
+    const config = require('./config/env').getConfig();
+    logger.info('Restaurant Voice Agent Server started successfully', {
       pid: process.pid,
       nodeVersion: process.version,
       platform: process.platform,
-      architecture: process.arch
+      architecture: process.arch,
+      environment: process.env.NODE_ENV || 'development',
+      port: config.PORT,
+      logLevel: config.LOG_LEVEL,
+      maxConcurrentCalls: config.MAX_CONCURRENT_CALLS,
+      databaseConnected: true,
+      gracefulShutdown: true,
+      startupTime: new Date().toISOString()
     });
 
-    // Log graceful shutdown capability
-    logger.info('✅ Graceful shutdown handlers configured');
-
-    // Optional: Log server metrics periodically
-    if (process.env.NODE_ENV === 'development') {
-      setInterval(() => {
-        const memUsage = process.memoryUsage();
-        logger.debug('Server metrics', {
-          memory: {
-            used: Math.round(memUsage.heapUsed / 1024 / 1024),
-            total: Math.round(memUsage.heapTotal / 1024 / 1024)
-          },
-          uptime: Math.round(process.uptime())
-        });
-      }, 60000); // Every minute in development
+    // Log important configuration in production
+    if (process.env.NODE_ENV === 'production') {
+      logger.info('Production configuration active', {
+        cors: 'enabled',
+        rateLimiting: 'enabled',
+        requestTimeout: '30s',
+        healthChecks: 'enabled',
+        correlationTracking: 'enabled'
+      });
     }
+
+    // Log server metrics periodically
+    const metricsInterval = process.env.NODE_ENV === 'production' ? 300000 : 60000; // 5 min prod, 1 min dev
+    setInterval(() => {
+      const memUsage = process.memoryUsage();
+      const cpuUsage = process.cpuUsage();
+      
+      logger.info('Server health metrics', {
+        memory: {
+          heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+          heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
+          rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
+          external: `${Math.round(memUsage.external / 1024 / 1024)}MB`
+        },
+        cpu: {
+          user: Math.round(cpuUsage.user / 1000), // Convert to ms
+          system: Math.round(cpuUsage.system / 1000)
+        },
+        uptime: `${Math.round(process.uptime())}s`,
+        timestamp: new Date().toISOString()
+      });
+    }, metricsInterval);
 
   } catch (error) {
     logger.error('Failed to start server', {

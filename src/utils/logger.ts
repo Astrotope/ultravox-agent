@@ -70,15 +70,23 @@ export class Logger {
       
       const transports: winston.transport[] = [];
 
-      // Console transport for development
-      if (process.env.NODE_ENV !== 'production') {
-        transports.push(
-          new winston.transports.Console({
-            level: config.LOG_LEVEL,
-            format: consoleFormat
-          })
-        );
-      }
+      // Console transport (always enabled for visibility)
+      const productionConsoleFormat = winston.format.combine(
+        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+        winston.format.printf(({ timestamp, level, message, correlationId, ...meta }) => {
+          const prefix = correlationId ? `[${correlationId}]` : '';
+          const metaStr = Object.keys(meta).length && config.LOG_LEVEL === 'debug' 
+            ? ` ${JSON.stringify(meta)}` : '';
+          return `${timestamp} [${level.toUpperCase()}] ${prefix} ${message}${metaStr}`;
+        })
+      );
+      
+      transports.push(
+        new winston.transports.Console({
+          level: config.LOG_LEVEL,
+          format: process.env.NODE_ENV === 'production' ? productionConsoleFormat : consoleFormat
+        })
+      );
 
       // File transports for all environments
       transports.push(

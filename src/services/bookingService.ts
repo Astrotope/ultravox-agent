@@ -9,6 +9,7 @@ import {
   checkAvailabilitySchema
 } from '../schemas';
 import { ApplicationError, ValidationError } from '../middleware/error.middleware';
+import { logger } from '../utils/logger';
 
 // Re-export types for backward compatibility
 export type CreateBookingData = MakeReservationRequest;
@@ -167,12 +168,27 @@ export class BookingService {
   }
 
   async createBooking(data: CreateBookingData): Promise<Booking> {
+    const startTime = Date.now();
+    
+    logger.info('Booking creation started', {
+      customerName: data.customerName,
+      date: data.date,
+      time: data.time,
+      partySize: data.partySize,
+      phone: data.phone ? `${data.phone.substring(0, 3)}***${data.phone.substring(data.phone.length - 2)}` : undefined
+    });
+    
     // Validate input data with Zod
     const validatedData = this.validateBookingData(data);
     
     // Parse and validate the date
     const dateResult = this.parseDate(validatedData.date);
     if (!dateResult.isValid) {
+      logger.warn('Booking creation failed - invalid date', {
+        customerName: validatedData.customerName,
+        inputDate: validatedData.date,
+        error: dateResult.error
+      });
       throw new ValidationError(`Invalid date: ${dateResult.error || 'Date must be in the future'}`);
     }
 
@@ -223,6 +239,13 @@ export class BookingService {
     });
 
     if (existingBooking) {
+      logger.warn('Booking creation failed - duplicate reservation', {
+        customerName: validatedData.customerName,
+        date: parsedDate,
+        time: validatedData.time,
+        existingConfirmationCode: existingBooking.confirmationCode,
+        existingPartySize: existingBooking.partySize
+      });
       throw new ApplicationError(`You already have a reservation (${existingBooking.confirmationCode}) for ${existingBooking.partySize} people at ${validatedData.time} on ${parsedDate}. To modify this booking, please use your confirmation code or call us.`, 409);
     }
 
@@ -237,6 +260,18 @@ export class BookingService {
         partySize: validatedData.partySize,
         specialRequirements: validatedData.specialRequirements,
       }
+    });
+
+    const duration = Date.now() - startTime;
+    logger.info('Booking created successfully', {
+      bookingId: booking.id,
+      confirmationCode: booking.confirmationCode,
+      customerName: booking.customerName,
+      date: booking.date,
+      time: booking.time,
+      partySize: booking.partySize,
+      duration: `${duration}ms`,
+      createdAt: booking.createdAt
     });
 
     return booking;
