@@ -31,6 +31,9 @@ NC='\033[0m' # No Color
 TOTAL_TESTS=0
 PASSED_TESTS=0
 
+# Track test customer name for cleanup
+TEST_CUSTOMER_NAME="TEST_USER_$(date +%s)_$$"
+
 echo -e "${BLUE}🧪 Testing Twilio Ultravox Agent Server${NC}"
 echo -e "${BLUE}Base URL: ${BASE_URL}${NC}"
 echo -e "${BLUE}API Key: ${API_KEY:0:20}...${NC}"
@@ -132,7 +135,7 @@ run_test "Check availability validation" \
     '"success":false.*"Validation failed"'
 
 run_test "Make reservation" \
-    "curl -s -X POST -H 'Content-Type: application/json' -d '{\"customerName\": \"Test User\", \"date\": \"2025-06-30\", \"time\": \"7:30 PM\", \"partySize\": 2, \"phone\": \"+1234567890\"}' ${BASE_URL}/api/v1/tools/make-reservation" \
+    "curl -s -X POST -H 'Content-Type: application/json' -d '{\"customerName\": \"'$TEST_CUSTOMER_NAME'\", \"date\": \"2025-12-25\", \"time\": \"7:30 PM\", \"partySize\": 2, \"phone\": \"+1234567890\", \"specialRequirements\": \"Endpoint test booking\"}' ${BASE_URL}/api/v1/tools/make-reservation" \
     '"success":true.*"confirmationCode".*"phoneticCode"'
 
 run_test "Make reservation validation" \
@@ -161,17 +164,40 @@ run_negative_test "404 for unknown route" \
 
 run_test "CORS headers present" \
     "curl -s -I ${BASE_URL}/health" \
-    "X-Correlation-ID"
+    "[xX]-[cC]orrelation-[iI][dD]"
 
 echo -e "${BLUE}=== Test Results ===${NC}"
 echo -e "Total tests: ${TOTAL_TESTS}"
 echo -e "Passed: ${GREEN}${PASSED_TESTS}${NC}"
 echo -e "Failed: ${RED}$((TOTAL_TESTS - PASSED_TESTS))${NC}"
 
+# Cleanup function
+cleanup_test_data() {
+    if [[ -n "$TEST_CUSTOMER_NAME" ]]; then
+        echo -e "${BLUE}🧹 Cleaning up test booking for ${TEST_CUSTOMER_NAME}...${NC}"
+        # Use the existing cleanup script
+        if command -v node >/dev/null 2>&1 && [[ -f "scripts/cleanup-test-bookings.js" ]]; then
+            cleanup_output=$(node scripts/cleanup-test-bookings.js 2>&1)
+            if [[ $cleanup_output =~ "Cleaned up" ]]; then
+                echo -e "${GREEN}✅ ${cleanup_output}${NC}"
+            else
+                echo -e "${YELLOW}⚠️  Cleanup script not available or failed${NC}"
+            fi
+        else
+            echo -e "${YELLOW}⚠️  Cleanup script not available${NC}"
+        fi
+    fi
+}
+
+# Set up cleanup trap
+trap cleanup_test_data EXIT
+
 if [[ $PASSED_TESTS -eq $TOTAL_TESTS ]]; then
     echo -e "${GREEN}🎉 All tests passed!${NC}"
+    cleanup_test_data
     exit 0
 else
     echo -e "${RED}❌ Some tests failed.${NC}"
+    cleanup_test_data
     exit 1
 fi
