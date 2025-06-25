@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import { getConfig } from '../config';
 import { CallManagerService } from './callManagerService';
+import { logger } from '../utils/logger';
 
 export class TwilioService {
   private client: twilio.Twilio;
@@ -21,13 +22,34 @@ export class TwilioService {
    * Transfer an active call to human agent
    */
   async transferActiveCall(ultravoxCallId: string, callManager: CallManagerService): Promise<any> {
+    const startTime = Date.now();
+    
+    logger.info('Initiating call transfer to human agent', {
+      ultravoxCallId,
+      humanAgentPhone: this.config.HUMAN_AGENT_PHONE,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       const activeCalls = callManager.getActiveCalls();
       const callData = activeCalls.get(ultravoxCallId);
       
       if (!callData || !callData.twilioCallSid) {
+        logger.error('Call transfer failed - call not found', {
+          ultravoxCallId,
+          callDataExists: !!callData,
+          twilioCallSidExists: callData ? !!callData.twilioCallSid : false,
+          activeCallCount: activeCalls.size
+        });
         throw new Error('Call not found or invalid CallSid');
       }
+      
+      logger.debug('Call data retrieved for transfer', {
+        ultravoxCallId,
+        twilioCallSid: callData.twilioCallSid,
+        callStatus: callData.status,
+        callStartTime: callData.timestamp
+      });
 
       const openStatus = this.isRestaurantOpen();
       let message: string;
@@ -37,6 +59,13 @@ export class TwilioService {
       } else {
         message = "I'm attempting to connect you with our booking team. Since we're currently closed, there may be no immediate answer. Please try calling back during our regular hours if no one is available.";
       }
+      
+      logger.debug('Restaurant status checked for transfer', {
+        ultravoxCallId,
+        isOpen: openStatus.isOpen,
+        statusMessage: openStatus.message,
+        transferMessage: message.substring(0, 100) + '...'
+      });
 
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say({ voice: this.config.TWILIO_VOICE as any }, message);
@@ -44,11 +73,30 @@ export class TwilioService {
       dial.number(this.config.HUMAN_AGENT_PHONE);
       twiml.say({ voice: this.config.TWILIO_VOICE as any },
         "I'm sorry, but I wasn't able to connect you with our booking team right now. Please try calling back during our regular business hours. Thank you for calling Bella Vista!");
+      
+      logger.debug('TwiML generated for call transfer', {
+        ultravoxCallId,
+        twilioCallSid: callData.twilioCallSid,
+        dialTimeout: 30,
+        targetNumber: this.config.HUMAN_AGENT_PHONE,
+        voice: this.config.TWILIO_VOICE
+      });
 
       const updatedCall = await this.client.calls(callData.twilioCallSid)
         .update({
           twiml: twiml.toString()
         });
+      
+      const duration = Date.now() - startTime;
+      
+      logger.info('Call transfer completed successfully', {
+        ultravoxCallId,
+        twilioCallSid: callData.twilioCallSid,
+        transferDuration: duration,
+        updatedCallStatus: updatedCall.status,
+        humanAgentPhone: this.config.HUMAN_AGENT_PHONE,
+        restaurantOpen: openStatus.isOpen
+      });
 
       return {
         status: 'success',
@@ -57,8 +105,17 @@ export class TwilioService {
       };
 
     } catch (error) {
-      console.error('Error transferring call:', error);
+      const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      logger.error('Call transfer failed', {
+        ultravoxCallId,
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        duration,
+        humanAgentPhone: this.config.HUMAN_AGENT_PHONE
+      });
+      
       throw {
         status: 'error',
         message: 'Failed to transfer call',
@@ -115,7 +172,10 @@ export class TwilioService {
         };
       }
     } catch (error) {
-      console.error('Error in isRestaurantOpen:', error);
+      logger.error('Error in restaurant hours calculation', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        currentTime: new Date().toISOString()
+      });
       return {
         isOpen: false,
         message: "We're open Monday through Sunday from 5:00 PM to 10:00 PM (11:00 PM on weekends)."

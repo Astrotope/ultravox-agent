@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { ActiveCall } from '../types';
 import { getConfig } from '../config';
+import { logger } from '../utils/logger';
 
 const MAX_EVENT_LISTENERS = 100;
 
@@ -28,11 +29,27 @@ export class CallManagerService {
    * Atomic operation to reserve a call slot
    */
   reserveCallSlot(): boolean {
-    if (this.activeCallCount + this.semaphore >= this.maxConcurrentCalls) {
-      return false;
+    const currentLoad = this.activeCallCount + this.semaphore;
+    const canReserve = currentLoad < this.maxConcurrentCalls;
+    
+    if (canReserve) {
+      this.semaphore++;
+      logger.debug('Call slot reserved', {
+        activeCallCount: this.activeCallCount,
+        semaphore: this.semaphore,
+        maxConcurrentCalls: this.maxConcurrentCalls,
+        currentLoad: currentLoad + 1
+      });
+    } else {
+      logger.warn('Call slot reservation denied - capacity limit reached', {
+        activeCallCount: this.activeCallCount,
+        semaphore: this.semaphore,
+        maxConcurrentCalls: this.maxConcurrentCalls,
+        currentLoad
+      });
     }
-    this.semaphore++;
-    return true;
+    
+    return canReserve;
   }
 
   /**
@@ -41,6 +58,17 @@ export class CallManagerService {
   releaseCallSlot(): void {
     if (this.semaphore > 0) {
       this.semaphore--;
+      logger.debug('Call slot released', {
+        activeCallCount: this.activeCallCount,
+        semaphore: this.semaphore,
+        maxConcurrentCalls: this.maxConcurrentCalls,
+        reason: 'call_creation_failed'
+      });
+    } else {
+      logger.warn('Attempted to release call slot when semaphore is zero', {
+        activeCallCount: this.activeCallCount,
+        semaphore: this.semaphore
+      });
     }
   }
 
@@ -48,20 +76,33 @@ export class CallManagerService {
    * Register successful call (converts reservation to active call)
    */
   registerCall(callId: string, twilioCallSid: string): void {
-    this.activeCalls.set(callId, {
+    const timestamp = new Date().toISOString();
+    const call: ActiveCall = {
       twilioCallSid,
-      timestamp: new Date().toISOString(),
+      timestamp,
       status: 'connecting',
       lastActivity: new Date()
-    });
+    };
     
+    this.activeCalls.set(callId, call);
     this.activeCallCount++;
+    
     if (this.semaphore > 0) {
       this.semaphore--;
     }
     
     this.events.emit('callStarted', callId, twilioCallSid);
-    console.log(`📞 Call registered: ${callId} (${this.activeCallCount}/${this.maxConcurrentCalls})`);
+    
+    logger.info('Call registered successfully', {
+      callId,
+      twilioCallSid,
+      activeCallCount: this.activeCallCount,
+      maxConcurrentCalls: this.maxConcurrentCalls,
+      semaphore: this.semaphore,
+      timestamp,
+      status: 'connecting',
+      utilizationPercentage: Math.round((this.activeCallCount / this.maxConcurrentCalls) * 100)
+    });
   }
 
   /**
@@ -70,8 +111,24 @@ export class CallManagerService {
   updateCallStatus(callId: string, status: ActiveCall['status']): void {
     const call = this.activeCalls.get(callId);
     if (call) {
+      const previousStatus = call.status;
       call.status = status;
       call.lastActivity = new Date();
+      
+      logger.info('Call status updated', {
+        callId,
+        twilioCallSid: call.twilioCallSid,
+        previousStatus,
+        newStatus: status,
+        timestamp: call.lastActivity.toISOString(),
+        activeCallCount: this.activeCallCount
+      });
+    } else {
+      logger.warn('Attempted to update status for unknown call', {
+        callId,
+        requestedStatus: status,
+        activeCallCount: this.activeCallCount
+      });
     }
   }
 
@@ -81,18 +138,51 @@ export class CallManagerService {
   endCall(callId: string, reason: string): void {
     const call = this.activeCalls.get(callId);
     if (call && call.status !== 'ended') {
+      const previousStatus = call.status;
+      const startTime = new Date(call.timestamp);
+      const endTime = new Date();
+      const callDuration = endTime.getTime() - startTime.getTime();
+      
       call.status = 'ended';
-      call.lastActivity = new Date();
+      call.lastActivity = endTime;
       this.activeCallCount--;
       
       // Schedule removal after retention period
       const CALL_RETENTION_TIME = 30000; // 30 seconds
       setTimeout(() => {
         this.activeCalls.delete(callId);
+        logger.debug('Call record removed from memory', {
+          callId,
+          retentionTime: CALL_RETENTION_TIME
+        });
       }, CALL_RETENTION_TIME);
       
       this.events.emit('callEnded', callId, reason);
-      console.log(`📞 Call ended: ${callId}, reason: ${reason} (${this.activeCallCount}/${this.maxConcurrentCalls})`);
+      
+      logger.info('Call ended', {
+        callId,
+        twilioCallSid: call.twilioCallSid,
+        reason,
+        previousStatus,
+        activeCallCount: this.activeCallCount,
+        maxConcurrentCalls: this.maxConcurrentCalls,
+        callDurationMs: callDuration,
+        callDurationMinutes: Math.round(callDuration / 60000 * 100) / 100,
+        endTime: endTime.toISOString(),
+        utilizationPercentage: Math.round((this.activeCallCount / this.maxConcurrentCalls) * 100)
+      });
+    } else if (!call) {
+      logger.warn('Attempted to end unknown call', {
+        callId,
+        reason,
+        activeCallCount: this.activeCallCount
+      });
+    } else {
+      logger.debug('Call already ended, ignoring duplicate end request', {
+        callId,
+        reason,
+        currentStatus: call.status
+      });
     }
   }
 
@@ -146,11 +236,21 @@ export class CallManagerService {
         staleCallIds.forEach(callId => {
           const call = this.activeCalls.get(callId);
           if (call && call.status !== 'ended') {
-            console.log(`🧹 Force ending stale call: ${callId}`);
+            logger.warn('Force ending stale call', {
+              callId,
+              twilioCallSid: call.twilioCallSid,
+              status: call.status,
+              lastActivity: call.lastActivity.toISOString(),
+              staleDurationMs: now.getTime() - call.lastActivity.getTime(),
+              reason: 'stale-cleanup'
+            });
             this.endCall(callId, 'stale-cleanup');
           } else {
             this.activeCalls.delete(callId);
-            console.log(`🧹 Cleaned up old call record: ${callId}`);
+            logger.debug('Cleaned up old call record', {
+              callId,
+              reason: 'automatic-cleanup'
+            });
           }
         });
         

@@ -17,6 +17,9 @@ interface TwilioWebhookData {
   CallStatus: string;
   From?: string;
   To?: string;
+  Direction?: string;
+  ForwardedFrom?: string;
+  AccountSid?: string;
   // Add other webhook fields as needed
 }
 
@@ -31,52 +34,122 @@ export class WebhookService {
   }
 
   async handleUltravoxWebhook(data: UltravoxWebhookData): Promise<any> {
+    const startTime = Date.now();
     const { event_type, call_id } = data;
 
-    logger.info('Processing Ultravox webhook', {
+    logger.info('Ultravox webhook received', {
       eventType: event_type,
-      callId: call_id
+      callId: call_id,
+      timestamp: new Date().toISOString(),
+      payload: data
     });
 
-    switch (event_type) {
-      case 'call_started':
-        return this.handleCallStarted(data);
-      case 'call_ended':
-        return this.handleCallEnded(data);
-      case 'transcript':
-        return this.handleTranscript(data);
-      default:
-        logger.warn('Unknown Ultravox webhook event type', {
-          eventType: event_type,
-          callId: call_id
-        });
-        return { status: 'unknown_event', event_type };
+    try {
+      let result;
+      
+      switch (event_type) {
+        case 'call_started':
+          result = await this.handleCallStarted(data);
+          break;
+        case 'call_ended':
+          result = await this.handleCallEnded(data);
+          break;
+        case 'transcript':
+          result = await this.handleTranscript(data);
+          break;
+        default:
+          logger.warn('Unknown Ultravox webhook event type', {
+            eventType: event_type,
+            callId: call_id,
+            availableEventTypes: ['call_started', 'call_ended', 'transcript'],
+            fullPayload: data
+          });
+          result = { status: 'unknown_event', event_type };
+      }
+      
+      const duration = Date.now() - startTime;
+      logger.debug('Ultravox webhook processed successfully', {
+        eventType: event_type,
+        callId: call_id,
+        duration,
+        result
+      });
+      
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('Error processing Ultravox webhook', {
+        eventType: event_type,
+        callId: call_id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        duration,
+        payload: data
+      });
+      throw error;
     }
   }
 
   async handleTwilioWebhook(data: TwilioWebhookData): Promise<any> {
+    const startTime = Date.now();
     const { CallSid, CallStatus } = data;
 
-    logger.info('Processing Twilio webhook', {
+    logger.info('Twilio webhook received', {
       callSid: CallSid,
-      callStatus: CallStatus
+      callStatus: CallStatus,
+      from: data.From,
+      to: data.To,
+      direction: data.Direction,
+      timestamp: new Date().toISOString(),
+      payload: data
     });
 
-    switch (CallStatus) {
-      case 'ringing':
-        return this.handleTwilioRinging(data);
-      case 'in-progress':
-        return this.handleTwilioInProgress(data);
-      case 'completed':
-        return this.handleTwilioCompleted(data);
-      case 'failed':
-        return this.handleTwilioFailed(data);
-      default:
-        logger.warn('Unknown Twilio call status', {
-          callSid: CallSid,
-          callStatus: CallStatus
-        });
-        return { status: 'unknown_status', call_status: CallStatus };
+    try {
+      let result;
+      
+      switch (CallStatus) {
+        case 'ringing':
+          result = await this.handleTwilioRinging(data);
+          break;
+        case 'in-progress':
+          result = await this.handleTwilioInProgress(data);
+          break;
+        case 'completed':
+          result = await this.handleTwilioCompleted(data);
+          break;
+        case 'failed':
+          result = await this.handleTwilioFailed(data);
+          break;
+        default:
+          logger.warn('Unknown Twilio call status', {
+            callSid: CallSid,
+            callStatus: CallStatus,
+            validStatuses: ['ringing', 'in-progress', 'completed', 'failed'],
+            fullPayload: data
+          });
+          result = { status: 'unknown_status', call_status: CallStatus };
+      }
+      
+      const duration = Date.now() - startTime;
+      logger.debug('Twilio webhook processed successfully', {
+        callSid: CallSid,
+        callStatus: CallStatus,
+        duration,
+        result
+      });
+      
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('Error processing Twilio webhook', {
+        callSid: CallSid,
+        callStatus: CallStatus,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        duration,
+        payload: data
+      });
+      throw error;
     }
   }
 
@@ -156,37 +229,85 @@ export class WebhookService {
   }
 
   async handleTwilioVoiceWebhook(data: any): Promise<string> {
+    const startTime = Date.now();
+    const twilioCallSid = data.CallSid;
+    const from = data.From;
+    const to = data.To;
+    
     try {
-      const twilioCallSid = data.CallSid;
-      logger.info('Handling Twilio voice webhook for incoming call', {
+      logger.info('Twilio voice webhook received', {
         callSid: twilioCallSid,
-        from: data.From,
-        to: data.To
+        from,
+        to,
+        callStatus: data.CallStatus,
+        direction: data.Direction,
+        forwardedFrom: data.ForwardedFrom,
+        timestamp: new Date().toISOString(),
+        fullPayload: data
+      });
+
+      // Check capacity status
+      const capacityInfo = {
+        activeCount: this.callManager.getActiveCallCount(),
+        maxConcurrent: this.config.MAX_CONCURRENT_CALLS,
+        canAccept: this.callManager.canAcceptCall()
+      };
+      
+      logger.debug('Call capacity check', {
+        callSid: twilioCallSid,
+        ...capacityInfo,
+        utilizationPercentage: Math.round((capacityInfo.activeCount / capacityInfo.maxConcurrent) * 100)
       });
 
       // Check if we can accept the call
-      if (!this.callManager.canAcceptCall()) {
-        logger.warn('Call rejected - at capacity', {
+      if (!capacityInfo.canAccept) {
+        logger.warn('Call rejected - at capacity limit', {
           callSid: twilioCallSid,
-          activeCount: this.callManager.getActiveCallCount(),
-          maxConcurrent: this.config.MAX_CONCURRENT_CALLS
+          from,
+          to,
+          ...capacityInfo,
+          rejectionReason: 'capacity_limit_reached'
         });
 
         const twiml = new twilio.twiml.VoiceResponse();
+        const busyMessage = `Thank you for calling Bella Vista Italian Restaurant. We're currently experiencing high call volume and all our lines are busy. Please try calling back in a few minutes, or visit our website to make a reservation online. We apologize for the inconvenience and look forward to serving you soon.`;
+        
         twiml.say({ 
           voice: this.config.TWILIO_VOICE as any 
-        }, `Thank you for calling Bella Vista Italian Restaurant. We're currently experiencing high call volume and all our lines are busy. Please try calling back in a few minutes, or visit our website to make a reservation online. We apologize for the inconvenience and look forward to serving you soon.`);
+        }, busyMessage);
+        
+        logger.debug('TwiML response generated for capacity rejection', {
+          callSid: twilioCallSid,
+          response: 'busy_message',
+          messageLength: busyMessage.length,
+          voice: this.config.TWILIO_VOICE
+        });
         
         return twiml.toString();
       }
 
-      // Reserve call slot
-      if (!this.callManager.reserveCallSlot()) {
-        logger.warn('Failed to reserve call slot', { callSid: twilioCallSid });
+      // Attempt to reserve call slot
+      const slotReserved = this.callManager.reserveCallSlot();
+      
+      if (!slotReserved) {
+        logger.error('Critical: Call slot reservation failed despite capacity check', {
+          callSid: twilioCallSid,
+          from,
+          to,
+          capacityInfo,
+          reason: 'race_condition_possible'
+        });
+        
         const twiml = new twilio.twiml.VoiceResponse();
         twiml.say({ voice: this.config.TWILIO_VOICE as any }, 'All our lines are currently busy. Please try again later.');
         return twiml.toString();
       }
+      
+      logger.debug('Call slot reserved successfully', {
+        callSid: twilioCallSid,
+        activeCount: this.callManager.getActiveCallCount(),
+        reservationTime: Date.now() - startTime
+      });
 
       // Create Ultravox call with full configuration
       const callConfig = {

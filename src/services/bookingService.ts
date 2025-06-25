@@ -107,6 +107,14 @@ export class BookingService {
   }
 
   async checkAvailability({ date, partySize }: BookingAvailabilityParams): Promise<BookingSlot[]> {
+    const startTime = Date.now();
+    
+    logger.debug('Availability check initiated', {
+      date,
+      partySize,
+      totalTimeSlots: this.baseTimeSlots.length
+    });
+    
     // Get existing bookings for the date
     const existingBookings = await prisma.booking.findMany({
       where: {
@@ -114,12 +122,26 @@ export class BookingService {
         status: 'CONFIRMED'
       }
     });
-
+    
+    const queryDuration = Date.now() - startTime;
+    
     // Ensure existingBookings is an array (defensive programming)
     const bookings = Array.isArray(existingBookings) ? existingBookings : [];
+    
+    logger.debug('Existing bookings retrieved', {
+      date,
+      bookingCount: bookings.length,
+      queryDuration,
+      bookingDetails: bookings.map(b => ({
+        time: b.time,
+        partySize: b.partySize,
+        confirmationCode: b.confirmationCode
+      }))
+    });
 
     // Calculate availability for each time slot
     const availableSlots: BookingSlot[] = [];
+    const slotAnalysis: any[] = [];
 
     for (const slot of this.baseTimeSlots) {
       // Find bookings for this specific time slot
@@ -131,6 +153,17 @@ export class BookingService {
       // Calculate remaining capacity
       const remainingCapacity = slot.maxCapacity - totalBooked;
       
+      const slotInfo = {
+        time: slot.time,
+        maxCapacity: slot.maxCapacity,
+        existingBookings: slotBookings.length,
+        totalBooked,
+        remainingCapacity,
+        canAccommodate: remainingCapacity >= partySize
+      };
+      
+      slotAnalysis.push(slotInfo);
+      
       // Check if this slot can accommodate the requested party size
       if (remainingCapacity >= partySize) {
         availableSlots.push({
@@ -141,6 +174,18 @@ export class BookingService {
         });
       }
     }
+    
+    const totalDuration = Date.now() - startTime;
+    
+    logger.info('Availability check completed', {
+      date,
+      partySize,
+      availableSlots: availableSlots.length,
+      totalSlots: this.baseTimeSlots.length,
+      totalDuration,
+      queryDuration,
+      slotAnalysis
+    });
 
     return availableSlots;
   }
