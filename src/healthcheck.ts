@@ -6,13 +6,22 @@
  */
 
 import http from 'http';
+import https from 'https';
 import { prisma } from './config/database';
 
 async function healthCheck(): Promise<void> {
   try {
     // Check if HTTP server is responding
     const httpCheck = new Promise<void>((resolve, reject) => {
-      const req = http.get('http://localhost:3000/health', (res) => {
+      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const protocol = new URL(baseUrl).protocol; // 'http:' or 'https:'
+      const port = process.env.PORT || 3000;
+      const healthUrl = `${protocol}//localhost:${port}/health`;
+      
+      const isHttps = protocol === 'https:';
+      const httpModule = isHttps ? https : http;
+      
+      const req = httpModule.get(healthUrl, (res) => {
         if (res.statusCode === 200) {
           resolve();
         } else {
