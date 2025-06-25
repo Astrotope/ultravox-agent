@@ -142,6 +142,45 @@ run_test "Make reservation validation" \
     "curl -s -X POST -H 'Content-Type: application/json' -d '{\"customerName\": \"\", \"date\": \"invalid\"}' ${BASE_URL}/api/v1/tools/make-reservation" \
     '"success":false.*"Validation failed"'
 
+# Store confirmation code for booking lookup tests
+CONFIRMATION_CODE=""
+if [ "$PASSED_TESTS" -gt 0 ]; then
+    # Get the last booking confirmation code (from successful reservation test)
+    LAST_BOOKING_RESPONSE=$(curl -s -X POST -H 'Content-Type: application/json' -d '{"customerName": "'$TEST_CUSTOMER_NAME'", "date": "2025-12-26", "time": "8:00 PM", "partySize": 2}' ${BASE_URL}/api/v1/tools/make-reservation)
+    if echo "$LAST_BOOKING_RESPONSE" | grep -q '"success":true'; then
+        CONFIRMATION_CODE=$(echo "$LAST_BOOKING_RESPONSE" | grep -o '"confirmationCode":"[^"]*"' | cut -d'"' -f4)
+        echo -e "${GREEN}📝 Created test booking with confirmation: $CONFIRMATION_CODE${NC}"
+    fi
+fi
+
+run_test "Check booking details" \
+    "curl -s -X POST -H 'Content-Type: application/json' -d '{\"confirmationCode\": \"${CONFIRMATION_CODE:-ABC}\"}' ${BASE_URL}/api/v1/tools/check-booking" \
+    '"success":true.*"booking"'
+
+run_test "Check booking details (alias endpoint)" \
+    "curl -s -X POST -H 'Content-Type: application/json' -d '{\"confirmationCode\": \"${CONFIRMATION_CODE:-ABC}\"}' ${BASE_URL}/api/v1/tools/get-booking-details" \
+    '"success":true.*"booking"'
+
+run_test "Check booking not found" \
+    "curl -s -X POST -H 'Content-Type: application/json' -d '{\"confirmationCode\": \"XYZ\"}' ${BASE_URL}/api/v1/tools/check-booking" \
+    '"success":false.*"error"'
+
+run_test "Daily specials" \
+    "curl -s ${BASE_URL}/api/v1/tools/daily-specials" \
+    '"success":true.*"specials".*"soup".*"meal"'
+
+run_test "Opening hours" \
+    "curl -s ${BASE_URL}/api/v1/tools/opening-hours" \
+    '"success":true.*"isOpen".*"hours"'
+
+run_test "Transfer call" \
+    "curl -s -X POST -H 'Content-Type: application/json' -d '{\"callId\": \"test-call-123\", \"reason\": \"Customer requested human agent\", \"customerName\": \"Test User\"}' ${BASE_URL}/api/v1/tools/transfer-call" \
+    '"success":true.*"status":"success".*"Call transfer initiated"'
+
+run_test "Transfer call minimal data" \
+    "curl -s -X POST -H 'Content-Type: application/json' -d '{\"callId\": \"test-call-456\", \"reason\": \"Complex request\"}' ${BASE_URL}/api/v1/tools/transfer-call" \
+    '"success":true.*"status":"success"'
+
 echo -e "${BLUE}=== API v1 Webhook Tests ===${NC}"
 
 run_test "Twilio webhook" \

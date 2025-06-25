@@ -43,4 +43,25 @@ router.post('/get-booking-details',
   asyncHandler(toolController.getBookingDetails.bind(toolController))
 );
 
+// Check booking tool (alias for get-booking-details for compatibility)
+router.post('/check-booking',
+  validateBody(checkBookingSchema),
+  asyncHandler(toolController.getBookingDetails.bind(toolController))
+);
+
+// Daily specials tool (GET endpoint)
+router.get('/daily-specials',
+  asyncHandler(toolController.getDailySpecials.bind(toolController))
+);
+
+// Opening hours tool (GET endpoint)
+router.get('/opening-hours',
+  asyncHandler(toolController.getOpeningHours.bind(toolController))
+);
+
+// Transfer call tool (POST endpoint with special callId handling)
+router.post('/transfer-call',
+  asyncHandler(toolController.transferCall.bind(toolController))
+);
+
 export default router;

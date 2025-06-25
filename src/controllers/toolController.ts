@@ -161,4 +161,80 @@ export class ToolController {
       throw error;
     }
   }
+
+  async getDailySpecials(req: Request, res: Response): Promise<void> {
+    try {
+      logger.info('Getting daily specials', {
+        correlationId: res.locals.correlationId
+      });
+
+      const result = await this.toolService.getDailySpecials();
+
+      logger.info('Retrieved daily specials', {
+        correlationId: res.locals.correlationId,
+        specials: result
+      });
+
+      ApiResponseUtil.success(res, result, 'Daily specials retrieved successfully');
+    } catch (error) {
+      logger.error('Error getting daily specials', {
+        correlationId: res.locals.correlationId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  async getOpeningHours(req: Request, res: Response): Promise<void> {
+    try {
+      logger.info('Getting opening hours', {
+        correlationId: res.locals.correlationId
+      });
+
+      const result = await this.toolService.getOpeningHours();
+
+      logger.info('Retrieved opening hours', {
+        correlationId: res.locals.correlationId,
+        hours: result
+      });
+
+      ApiResponseUtil.success(res, result, 'Opening hours retrieved successfully');
+    } catch (error) {
+      logger.error('Error getting opening hours', {
+        correlationId: res.locals.correlationId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  async transferCall(req: Request, res: Response): Promise<void> {
+    try {
+      const { callId, reason, customerName, summary } = req.body;
+      
+      logger.info('Transferring call', {
+        correlationId: res.locals.correlationId,
+        callId,
+        reason,
+        customerName
+      });
+
+      const result = await this.toolService.transferCall(callId, reason, customerName, summary);
+
+      logger.info('Call transfer completed', {
+        correlationId: res.locals.correlationId,
+        callId,
+        result
+      });
+
+      ApiResponseUtil.success(res, result, 'Call transfer initiated successfully');
+    } catch (error) {
+      logger.error('Error transferring call', {
+        correlationId: res.locals.correlationId,
+        transferData: req.body,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
 }

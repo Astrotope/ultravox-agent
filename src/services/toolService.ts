@@ -240,4 +240,112 @@ export class ToolService {
     }
   }
 
+  async getDailySpecials(): Promise<any> {
+    try {
+      logger.info('Tool: Getting daily specials');
+
+      // Mock daily specials data (in a real app, this might come from a database)
+      const specials = {
+        soup: "Tuscan White Bean Soup with rosemary and pancetta",
+        meal: "Pan-Seared Salmon with lemon herb risotto and seasonal vegetables"
+      };
+
+      return {
+        success: true,
+        message: `Today's specials are: For soup, we have ${specials.soup}. And our chef's special meal is ${specials.meal}.`,
+        specials
+      };
+    } catch (error) {
+      logger.error('Tool: Error getting daily specials', { error });
+      throw error;
+    }
+  }
+
+  async getOpeningHours(): Promise<any> {
+    try {
+      logger.info('Tool: Getting opening hours');
+
+      // Check if restaurant is currently open
+      const now = new Date();
+      const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      const currentTime = now.toTimeString().slice(0, 5);
+
+      const openingHours = {
+        monday: { open: "17:00", close: "22:00", closed: false },
+        tuesday: { open: "17:00", close: "22:00", closed: false },
+        wednesday: { open: "17:00", close: "22:00", closed: false },
+        thursday: { open: "17:00", close: "22:00", closed: false },
+        friday: { open: "17:00", close: "23:00", closed: false },
+        saturday: { open: "17:00", close: "23:00", closed: false },
+        sunday: { open: "17:00", close: "22:00", closed: false }
+      };
+
+      const todayHours = openingHours[currentDay as keyof typeof openingHours];
+      let isOpen = false;
+      let message = '';
+
+      if (todayHours && !todayHours.closed) {
+        isOpen = currentTime >= todayHours.open && currentTime <= todayHours.close;
+        
+        if (isOpen) {
+          message = `We're currently open until ${this.formatTime(todayHours.close)} today.`;
+        } else if (currentTime < todayHours.open) {
+          message = `We're currently closed but will open at ${this.formatTime(todayHours.open)} today.`;
+        } else {
+          message = `We're closed for today. We'll reopen tomorrow at ${this.formatTime(todayHours.open)}.`;
+        }
+      }
+
+      return {
+        success: true,
+        isOpen,
+        message,
+        hours: {
+          "Monday through Thursday": "5:00 PM to 10:00 PM",
+          "Friday and Saturday": "5:00 PM to 11:00 PM", 
+          "Sunday": "5:00 PM to 10:00 PM"
+        }
+      };
+    } catch (error) {
+      logger.error('Tool: Error getting opening hours', { error });
+      throw error;
+    }
+  }
+
+  async transferCall(callId: string, reason: string, customerName?: string, summary?: string): Promise<any> {
+    try {
+      logger.info('Tool: Transferring call', { callId, reason, customerName });
+
+      // Mock call transfer (in a real app, this would integrate with call management)
+      const openStatus = await this.getOpeningHours();
+      let message: string;
+
+      if (openStatus.isOpen) {
+        message = "I'm connecting you with our booking team. Please note that during busy serving hours, there may be a brief wait as our staff is focused on providing excellent service to our dining guests.";
+      } else {
+        message = "I'm attempting to connect you with our booking team. Since we're currently closed, there may be no immediate answer. Please try calling back during our regular hours if no one is available.";
+      }
+
+      return {
+        status: 'success',
+        message: 'Call transfer initiated',
+        transferMessage: message,
+        reason,
+        customerName,
+        summary
+      };
+    } catch (error) {
+      logger.error('Tool: Error transferring call', { error, callId, reason });
+      throw error;
+    }
+  }
+
+  private formatTime(time: string): string {
+    const [hour, minute] = time.split(':');
+    const hourNum = parseInt(hour);
+    const ampm = hourNum >= 12 ? 'PM' : 'AM';
+    const displayHour = hourNum > 12 ? hourNum - 12 : hourNum === 0 ? 12 : hourNum;
+    return minute === '00' ? `${displayHour} ${ampm}` : `${displayHour}:${minute} ${ampm}`;
+  }
+
 }

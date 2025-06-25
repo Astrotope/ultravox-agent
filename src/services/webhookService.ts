@@ -358,8 +358,100 @@ Always speak naturally and conversationally, use the customer's name, confirm al
                 httpMethod: "POST"
               }
             }
+          },
+          {
+            temporaryTool: {
+              modelToolName: "checkBooking",
+              description: "Look up an existing reservation by confirmation code",
+              defaultReaction: "AGENT_REACTION_SPEAKS",
+              dynamicParameters: [
+                {
+                  name: "confirmationCode",
+                  location: "PARAMETER_LOCATION_BODY",
+                  schema: {
+                    type: "string",
+                    description: "Three-letter confirmation code (e.g., ABC, XYZ)"
+                  },
+                  required: true
+                }
+              ],
+              http: {
+                baseUrlPattern: `${this.config.BASE_URL}/api/v1/tools/check-booking`,
+                httpMethod: "POST"
+              }
+            }
+          },
+          {
+            temporaryTool: {
+              modelToolName: "getDailySpecials",
+              description: "Get today's soup and meal specials",
+              defaultReaction: "AGENT_REACTION_SPEAKS",
+              dynamicParameters: [],
+              http: {
+                baseUrlPattern: `${this.config.BASE_URL}/api/v1/tools/daily-specials`,
+                httpMethod: "GET"
+              }
+            }
+          },
+          {
+            temporaryTool: {
+              modelToolName: "checkOpeningHours",
+              description: "Check if the restaurant is currently open and get opening hours information",
+              defaultReaction: "AGENT_REACTION_SPEAKS",
+              dynamicParameters: [],
+              http: {
+                baseUrlPattern: `${this.config.BASE_URL}/api/v1/tools/opening-hours`,
+                httpMethod: "GET"
+              }
+            }
+          },
+          {
+            temporaryTool: {
+              modelToolName: "transferCall",
+              description: "Transfer the call to a human booking agent when requested by the customer",
+              defaultReaction: "AGENT_REACTION_SPEAKS",
+              automaticParameters: [
+                {
+                  name: "callId",
+                  location: "PARAMETER_LOCATION_BODY",
+                  knownValue: "KNOWN_PARAM_CALL_ID"
+                }
+              ],
+              dynamicParameters: [
+                {
+                  name: "reason",
+                  location: "PARAMETER_LOCATION_BODY",
+                  schema: {
+                    type: "string",
+                    description: "Reason for the transfer"
+                  },
+                  required: true
+                },
+                {
+                  name: "customerName",
+                  location: "PARAMETER_LOCATION_BODY",
+                  schema: {
+                    type: "string",
+                    description: "Customer's name for the transfer"
+                  },
+                  required: false
+                },
+                {
+                  name: "summary",
+                  location: "PARAMETER_LOCATION_BODY",
+                  schema: {
+                    type: "string",
+                    description: "Brief summary of the conversation so far"
+                  },
+                  required: false
+                }
+              ],
+              http: {
+                baseUrlPattern: `${this.config.BASE_URL}/api/v1/tools/transfer-call`,
+                httpMethod: "POST"
+              }
+            }
           }
-          // Add other tools as needed
         ],
         medium: { "twilio": {} },
         inactivityMessages: [

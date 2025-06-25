@@ -452,6 +452,115 @@ Content-Type: application/json
 - Supports multiple formats: "X-ray Uniform Alpha", "XUA", "X for X-ray, U for Uniform"
 - Voice-friendly confirmation code lookups
 
+#### **Check Booking (Phonetic Support)**
+```bash
+POST /api/v1/tools/check-booking
+Content-Type: application/json
+
+{
+  "confirmationCode": "XUA"  // Also supports phonetic: "X-ray Uniform Alpha"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "booking": {
+      "confirmationCode": "XUA",
+      "phoneticCode": "X for X-ray, U for Uniform, A for Alpha",
+      "customerName": "John Doe",
+      "phone": "+1234567890",
+      "date": "2025-06-30",
+      "time": "7:00 PM", 
+      "partySize": 4,
+      "specialRequirements": "Window table preferred",
+      "status": "CONFIRMED"
+    },
+    "formattedDate": "Monday, June 30, 2025"
+  },
+  "message": "Booking details retrieved successfully",
+  "timestamp": "2025-06-25T07:48:18.019Z"
+}
+```
+
+#### **Daily Specials**
+```bash
+GET /api/v1/tools/daily-specials
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "message": "Today's specials are: For soup, we have Tuscan White Bean Soup with rosemary and pancetta. And our chef's special meal is Pan-Seared Salmon with lemon herb risotto and seasonal vegetables.",
+    "specials": {
+      "soup": "Tuscan White Bean Soup with rosemary and pancetta",
+      "meal": "Pan-Seared Salmon with lemon herb risotto and seasonal vegetables"
+    }
+  },
+  "message": "Daily specials retrieved successfully",
+  "timestamp": "2025-06-25T07:48:18.041Z"
+}
+```
+
+#### **Opening Hours**
+```bash
+GET /api/v1/tools/opening-hours
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "isOpen": true,
+    "message": "We're currently open until 10 PM today.",
+    "hours": {
+      "Monday through Thursday": "5:00 PM to 10:00 PM",
+      "Friday and Saturday": "5:00 PM to 11:00 PM",
+      "Sunday": "5:00 PM to 10:00 PM"
+    }
+  },
+  "message": "Opening hours retrieved successfully",
+  "timestamp": "2025-06-25T07:48:18.041Z"
+}
+```
+
+#### **Transfer Call**
+```bash
+POST /api/v1/tools/transfer-call
+Content-Type: application/json
+
+{
+  "callId": "call-123",
+  "reason": "Customer requested human agent",
+  "customerName": "John Doe",
+  "summary": "Customer wants to discuss large party booking"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "status": "success",
+    "message": "Call transfer initiated",
+    "transferMessage": "I'm connecting you with our booking team. Please note that during busy serving hours, there may be a brief wait as our staff is focused on providing excellent service to our dining guests.",
+    "reason": "Customer requested human agent",
+    "customerName": "John Doe",
+    "summary": "Customer wants to discuss large party booking"
+  },
+  "message": "Call transfer initiated successfully",
+  "timestamp": "2025-06-25T07:48:18.041Z"
+}
+```
+
 ### 🔐 **API v1 Admin (Authenticated Endpoints)**
 
 All admin endpoints require the `X-API-Key` header:

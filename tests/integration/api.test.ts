@@ -240,6 +240,127 @@ describe('API Versioning Integration Tests', () => {
         expect(response.body.success).toBe(false);
       });
     });
+
+    describe('POST /api/v1/tools/check-booking', () => {
+      it('should retrieve booking details using check-booking alias', async () => {
+        // First create a booking
+        const createResponse = await request(app)
+          .post('/api/v1/tools/make-reservation')
+          .send({
+            customerName: 'Check Booking Test',
+            date: '2025-07-03',
+            time: '7:30 PM',
+            partySize: 3
+          })
+          .expect(201);
+
+        const confirmationCode = createResponse.body.data.confirmationCode;
+
+        // Then retrieve it using check-booking endpoint
+        const response = await request(app)
+          .post('/api/v1/tools/check-booking')
+          .send({
+            confirmationCode
+          })
+          .expect(200);
+
+        expect(response.body).toMatchObject({
+          success: true,
+          data: expect.objectContaining({
+            booking: expect.objectContaining({
+              confirmationCode,
+              customerName: 'Check Booking Test',
+              partySize: 3
+            })
+          })
+        });
+      });
+    });
+
+    describe('GET /api/v1/tools/daily-specials', () => {
+      it('should return daily specials', async () => {
+        const response = await request(app)
+          .get('/api/v1/tools/daily-specials')
+          .expect(200);
+
+        expect(response.body).toMatchObject({
+          success: true,
+          data: expect.objectContaining({
+            success: true,
+            message: expect.stringContaining('specials'),
+            specials: expect.objectContaining({
+              soup: expect.any(String),
+              meal: expect.any(String)
+            })
+          })
+        });
+      });
+    });
+
+    describe('GET /api/v1/tools/opening-hours', () => {
+      it('should return opening hours and current status', async () => {
+        const response = await request(app)
+          .get('/api/v1/tools/opening-hours')
+          .expect(200);
+
+        expect(response.body).toMatchObject({
+          success: true,
+          data: expect.objectContaining({
+            success: true,
+            isOpen: expect.any(Boolean),
+            message: expect.any(String),
+            hours: expect.objectContaining({
+              'Monday through Thursday': expect.any(String),
+              'Friday and Saturday': expect.any(String),
+              'Sunday': expect.any(String)
+            })
+          })
+        });
+      });
+    });
+
+    describe('POST /api/v1/tools/transfer-call', () => {
+      it('should handle call transfer request', async () => {
+        const response = await request(app)
+          .post('/api/v1/tools/transfer-call')
+          .send({
+            callId: 'test-call-123',
+            reason: 'Customer requested human agent',
+            customerName: 'Transfer Test User',
+            summary: 'Customer wanted to discuss large party booking'
+          })
+          .expect(200);
+
+        expect(response.body).toMatchObject({
+          success: true,
+          data: expect.objectContaining({
+            status: 'success',
+            message: 'Call transfer initiated',
+            transferMessage: expect.any(String),
+            reason: 'Customer requested human agent',
+            customerName: 'Transfer Test User'
+          })
+        });
+      });
+
+      it('should handle transfer without optional parameters', async () => {
+        const response = await request(app)
+          .post('/api/v1/tools/transfer-call')
+          .send({
+            callId: 'test-call-456',
+            reason: 'Complex request'
+          })
+          .expect(200);
+
+        expect(response.body).toMatchObject({
+          success: true,
+          data: expect.objectContaining({
+            status: 'success',
+            reason: 'Complex request'
+          })
+        });
+      });
+    });
   });
 
   describe('Webhook Endpoints (v1)', () => {
