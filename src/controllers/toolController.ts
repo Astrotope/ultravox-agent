@@ -148,7 +148,12 @@ export class ToolController {
 
       ApiResponseUtil.success(res, result, 'Booking details retrieved successfully');
     } catch (error) {
-      logger.error('Error getting booking details', {
+      // Log 404 errors as warnings, other errors as errors
+      const statusCode = (error as any).statusCode || 500;
+      const isClientError = statusCode >= 400 && statusCode < 500;
+      const logLevel = isClientError ? 'warn' : 'error';
+      
+      logger[logLevel]('Error getting booking details', {
         correlationId: res.locals.correlationId,
         confirmationCode: req.body.confirmationCode,
         error: error instanceof Error ? error.message : 'Unknown error'

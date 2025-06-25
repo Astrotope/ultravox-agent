@@ -62,11 +62,11 @@ export class BookingService {
   // Convert phonetic alphabet back to letters
   convertPhoneticToLetters(phoneticInput: string): string {
     const phoneticAlphabet: { [key: string]: string } = {
-      'Alpha': 'A', 'Bravo': 'B', 'Charlie': 'C', 'Delta': 'D', 'Echo': 'E',
-      'Foxtrot': 'F', 'Golf': 'G', 'Hotel': 'H', 'India': 'I', 'Juliet': 'J',
-      'Kilo': 'K', 'Lima': 'L', 'Mike': 'M', 'November': 'N', 'Oscar': 'O',
-      'Papa': 'P', 'Quebec': 'Q', 'Romeo': 'R', 'Sierra': 'S', 'Tango': 'T',
-      'Uniform': 'U', 'Victor': 'V', 'Whiskey': 'W', 'X-ray': 'X', 'Yankee': 'Y', 'Zulu': 'Z'
+      'alpha': 'A', 'bravo': 'B', 'charlie': 'C', 'delta': 'D', 'echo': 'E',
+      'foxtrot': 'F', 'golf': 'G', 'hotel': 'H', 'india': 'I', 'juliet': 'J',
+      'kilo': 'K', 'lima': 'L', 'mike': 'M', 'november': 'N', 'oscar': 'O',
+      'papa': 'P', 'quebec': 'Q', 'romeo': 'R', 'sierra': 'S', 'tango': 'T',
+      'uniform': 'U', 'victor': 'V', 'whiskey': 'W', 'x-ray': 'X', 'yankee': 'Y', 'zulu': 'Z'
     };
     
     const normalizedInput = phoneticInput.trim().toLowerCase();
@@ -77,21 +77,25 @@ export class BookingService {
     }
     
     // Handle "V for Victor, M for Mike, G for Golf" format
-    const forPattern = /([a-z])\s+for\s+([a-z]+)/gi;
+    const forPattern = /([a-z])\s+for\s+([a-z\-]+)/gi;
     const forMatches = [...normalizedInput.matchAll(forPattern)];
     
     if (forMatches.length === 3) {
       return forMatches.map(match => match[1].toUpperCase()).join('');
     }
     
-    // Handle "Victor Mike Golf" format
-    const words = normalizedInput.split(/[\s\-]+/).filter(word => word.length > 0);
+    // Handle space/comma separated phonetic words
+    // Special handling for "X-ray" which gets split incorrectly
+    let processedInput = normalizedInput;
+    
+    // Replace known compound words
+    processedInput = processedInput.replace(/\bx[\s\-]*ray\b/gi, 'x-ray');
+    
+    // Now split and process
+    const words = processedInput.split(/[\s,]+/).filter(word => word.length > 0);
     
     if (words.length === 3) {
-      const letters = words.map(word => {
-        const capitalized = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-        return phoneticAlphabet[capitalized];
-      }).filter(Boolean);
+      const letters = words.map(word => phoneticAlphabet[word]).filter(Boolean);
       
       if (letters.length === 3) {
         return letters.join('');

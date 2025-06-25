@@ -7,8 +7,9 @@
 
 import { config } from 'dotenv';
 
-// Load environment variables first
-config();
+// Load environment variables first - support different env files based on NODE_ENV
+const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
+config({ path: envFile });
 
 import { initializeApp, startServer } from './app';
 import { logger } from './utils/logger';

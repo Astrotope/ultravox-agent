@@ -227,7 +227,15 @@ export class ToolService {
         formattedDate: DateUtils.formatDateForDisplay(booking.date)
       };
     } catch (error) {
-      logger.error('Tool: Error getting booking details', { error, confirmationCode });
+      // Log 404 errors as warnings, other errors as errors
+      const statusCode = (error as any).statusCode || 500;
+      const isClientError = statusCode >= 400 && statusCode < 500;
+      
+      if (isClientError) {
+        logger.warn('Tool: Error getting booking details', { error, confirmationCode });
+      } else {
+        logger.error('Tool: Error getting booking details', { error, confirmationCode });
+      }
       throw error;
     }
   }

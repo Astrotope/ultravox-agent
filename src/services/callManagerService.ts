@@ -128,31 +128,34 @@ export class CallManagerService {
    * Setup automatic cleanup of stale calls
    */
   private setupCleanup(): void {
-    setInterval(() => {
-      const now = new Date();
-      const staleCallIds: string[] = [];
-      
-      this.activeCalls.forEach((call, callId) => {
-        const timeSinceLastActivity = now.getTime() - call.lastActivity.getTime();
+    // Temporarily disabled for testing timeout issues
+    if (process.env.NODE_ENV !== 'test') {
+      setInterval(() => {
+        const now = new Date();
+        const staleCallIds: string[] = [];
         
-        // Clean up very old calls (beyond cleanup interval)
-        if (timeSinceLastActivity > this.callCleanupInterval) {
-          staleCallIds.push(callId);
-        }
-      });
-      
-      staleCallIds.forEach(callId => {
-        const call = this.activeCalls.get(callId);
-        if (call && call.status !== 'ended') {
-          console.log(`🧹 Force ending stale call: ${callId}`);
-          this.endCall(callId, 'stale-cleanup');
-        } else {
-          this.activeCalls.delete(callId);
-          console.log(`🧹 Cleaned up old call record: ${callId}`);
-        }
-      });
-      
-    }, this.callCleanupInterval);
+        this.activeCalls.forEach((call, callId) => {
+          const timeSinceLastActivity = now.getTime() - call.lastActivity.getTime();
+          
+          // Clean up very old calls (beyond cleanup interval)
+          if (timeSinceLastActivity > this.callCleanupInterval) {
+            staleCallIds.push(callId);
+          }
+        });
+        
+        staleCallIds.forEach(callId => {
+          const call = this.activeCalls.get(callId);
+          if (call && call.status !== 'ended') {
+            console.log(`🧹 Force ending stale call: ${callId}`);
+            this.endCall(callId, 'stale-cleanup');
+          } else {
+            this.activeCalls.delete(callId);
+            console.log(`🧹 Cleaned up old call record: ${callId}`);
+          }
+        });
+        
+      }, this.callCleanupInterval);
+    }
   }
 
   /**

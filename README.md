@@ -447,7 +447,29 @@ X-API-Key: your_admin_api_key
 
 ### 🔗 **API v1 Webhooks**
 
-#### **Twilio Webhook**
+#### **Twilio Voice Webhook (NEW)**
+```bash
+POST /api/v1/webhook/twilio/voice
+Content-Type: application/json
+
+{
+  "CallSid": "CA12345",
+  "From": "+1234567890",
+  "To": "+0987654321"
+}
+```
+
+**Response (TwiML XML):**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Connect>
+    <Stream url="wss://api.ultravox.ai/ws/..." name="bella-vista-agent"/>
+  </Connect>
+</Response>
+```
+
+#### **Twilio Status Webhook**
 ```bash
 POST /api/v1/webhook/twilio
 Content-Type: application/json
@@ -460,7 +482,7 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
+**Response (JSON):**
 ```json
 {
   "success": true,

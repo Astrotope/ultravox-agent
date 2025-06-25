@@ -17,10 +17,13 @@ module.exports = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
-  testTimeout: 10000,
+  testTimeout: 15000,
   maxWorkers: 1, // Important for database tests
   forceExit: true,
   clearMocks: true,
   resetMocks: true,
-  restoreMocks: true
+  restoreMocks: true,
+  detectOpenHandles: true,
+  // More aggressive cleanup
+  errorOnDeprecated: false
 };

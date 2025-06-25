@@ -151,7 +151,7 @@ describe('API Versioning Integration Tests (Simplified)', () => {
   });
 
   describe('Admin Endpoints (v1)', () => {
-    const adminApiKey = 'test_admin_key_12345678901234567890123456789012';
+    const adminApiKey = process.env.ADMIN_API_KEY || 'test_admin_key_12345678901234567890123456789012';
 
     describe('GET /api/v1/admin/stats', () => {
       it('should require authentication', async () => {
