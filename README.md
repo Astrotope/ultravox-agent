@@ -14,6 +14,8 @@ A sophisticated AI voice agent for restaurant reservations built with Ultravox, 
 - **API v1 Endpoints**: Modern RESTful API with Zod validation and proper error handling
 - **Robust Error Handling**: Intelligent 4xx vs 5xx error distinction with appropriate logging levels
 - **Phonetic Confirmation Codes**: Smart handling of voice-friendly booking confirmations
+- **Complete Tool Integration**: All 9 Ultravox tools implemented (availability, reservations, booking lookup, specials, hours, transfers)
+- **Enhanced Monitoring**: Rich emoji-based structured logging with correlation IDs and performance metrics
 
 ## 🏗️ Modern Architecture
 
@@ -263,7 +265,7 @@ ADMIN_API_KEY=your-actual-api-key ./test-endpoints.sh
 VERBOSE=true ADMIN_API_KEY=your-actual-api-key ./test-endpoints.sh
 
 # Test production server
-./test-endpoints.sh https://ultravox-agent.sliplane.app your-admin-api-key
+./test-endpoints.sh https://your-production-domain.com your-admin-api-key
 
 # Test Docker container
 docker run -p 3000:3000 --env-file .env twilio-ultravox-agent
@@ -280,7 +282,7 @@ docker run -p 3000:3000 --env-file .env twilio-ultravox-agent
 **Validated Environments:**
 - ✅ **npm run dev**: Local development server
 - ✅ **Docker Container**: Local containerized deployment
-- ✅ **Production**: Live deployment at https://ultravox-agent.sliplane.app
+- ✅ **Production**: Live deployment at https://your-production-domain.com
 
 **Sample Test Output:**
 ```
@@ -756,21 +758,6 @@ tests/                          # 187 Tests Total
     └── testApp.ts         # Test application factory
 ```
 
-### 📊 **Test Coverage Report**
-
-```bash
-npm run test:coverage
-
-# Example output:
-File                    | % Stmts | % Branch | % Funcs | % Lines
-------------------------|---------|----------|---------|--------
-All files              |   96.21 |    91.47 |   97.65 |   96.89
-src/controllers         |   94.31 |    87.71 |   100.0 |   94.31
-src/middleware          |   98.77 |    93.67 |   100.0 |   98.77
-src/services           |   97.45 |    90.89 |   96.44 |   97.45
-src/utils              |   93.30 |    87.71 |   92.91 |   93.30
-```
-
 ### 🎯 **Testing Best Practices Implemented**
 
 1. **Environment Isolation**: Automatic test database separation (`voice-agents-test`)
@@ -788,17 +775,17 @@ All three deployment environments validated with comprehensive endpoint testing:
 ```bash
 # Development Environment (npm run dev)
 npm run dev &
-ADMIN_API_KEY=bella-vista-B8JU11k4b3bcrVmdKSeDnLFF93yxdwUa ./test-endpoints.sh http://localhost:3000
+ADMIN_API_KEY=your-actual-admin-key ./test-endpoints.sh http://localhost:3000
 # Result: ✅ 13/13 tests passed
 
 # Docker Container Environment  
 docker build -t twilio-ultravox-agent .
 docker run -d --name test-container -p 3000:3000 --env-file .env twilio-ultravox-agent
-ADMIN_API_KEY=bella-vista-B8JU11k4b3bcrVmdKSeDnLFF93yxdwUa ./test-endpoints.sh http://localhost:3000
+ADMIN_API_KEY=your-actual-admin-key ./test-endpoints.sh http://localhost:3000
 # Result: ✅ 13/13 tests passed
 
 # Production Environment
-ADMIN_API_KEY=bella-vista-B8JU11k4b3bcrVmdKSeDnLFF93yxdwUa ./test-endpoints.sh https://ultravox-agent.sliplane.app
+ADMIN_API_KEY=your-actual-admin-key ./test-endpoints.sh https://your-production-domain.com
 # Result: ✅ 13/13 tests passed
 ```
 
@@ -1031,13 +1018,13 @@ const logger = winston.createLogger({
 
 ```bash
 # Basic health (uptime monitoring)
-curl https://ultravox-agent.sliplane.app/health
+curl https://your-production-domain.com/health
 
 # Detailed health (system diagnostics)  
-curl https://ultravox-agent.sliplane.app/health/detailed
+curl https://your-production-domain.com/health/detailed
 
 # Readiness check (load balancer health)
-curl https://ultravox-agent.sliplane.app/ready
+curl https://your-production-domain.com/ready
 ```
 
 ## 🚀 **Production Deployment (Validated)**
@@ -1072,7 +1059,7 @@ git push origin main
 # Configure environment variables in platform dashboard
 # Set webhook URLs in Twilio configuration
 # Verify deployment with comprehensive testing
-./test-endpoints.sh https://ultravox-agent.sliplane.app your-api-key
+./test-endpoints.sh https://your-production-domain.com your-api-key
 # Result: ✅ 13/13 tests passed
 ```
 
@@ -1283,7 +1270,13 @@ If upgrading from the legacy monolithic version:
 | `/ready` | GET | ❌ | Readiness probe | ✅ Tested |
 | `/api/v1/tools/check-availability` | POST | ❌ | Check reservation availability | ✅ Tested |
 | `/api/v1/tools/make-reservation` | POST | ❌ | Create new reservation | ✅ Tested |
+| `/api/v1/tools/modify-reservation` | POST | ❌ | Modify existing reservation | ✅ Tested |
+| `/api/v1/tools/cancel-reservation` | POST | ❌ | Cancel reservation | ✅ Tested |
 | `/api/v1/tools/get-booking-details` | POST | ❌ | Get booking (phonetic support) | ✅ Enhanced |
+| `/api/v1/tools/check-booking` | POST | ❌ | Get booking (alias) | ✅ **New** |
+| `/api/v1/tools/daily-specials` | GET | ❌ | Get daily specials | ✅ **New** |
+| `/api/v1/tools/opening-hours` | GET | ❌ | Get opening hours | ✅ **New** |
+| `/api/v1/tools/transfer-call` | POST | ❌ | Transfer call to human | ✅ **New** |
 | `/api/v1/webhook/twilio` | POST | ❌ | Twilio webhook handler | ✅ Tested |
 | `/api/v1/webhook/ultravox` | POST | ❌ | Ultravox webhook handler | ✅ Tested |
 | `/api/v1/admin/stats` | GET | ✅ | System statistics | ✅ Tested |
