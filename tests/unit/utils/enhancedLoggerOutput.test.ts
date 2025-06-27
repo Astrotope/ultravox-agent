@@ -89,6 +89,32 @@ class TestableEnhancedLogger {
           this.captureOutput(`   ${JSON.stringify(meta, null, 2)}`);
         }
       }
+      // Server startup and database events - order matters for pattern matching
+      else if (message.includes('Migration') || message.includes('migration')) {
+        const output = `🔄 ${message}`;
+        this.captureOutput(output);
+      }
+      else if (message.includes('shutdown') || message.includes('SIGTERM') || message.includes('Graceful')) {
+        const output = `🔄 ${message}`;
+        this.captureOutput(output);
+      }
+      else if (message.includes('Starting') && message.includes('shutdown')) {
+        const output = `🔄 ${message}`;
+        this.captureOutput(output);
+      }
+      else if (message.includes('Starting') || message.includes('Server started') || message.includes('started successfully')) {
+        const output = `🚀 ${message}`;
+        this.captureOutput(output);
+      }
+      else if (message.includes('Database') || message.includes('database') || message.includes('Connecting to')) {
+        const output = `🗄️ ${message}`;
+        this.captureOutput(output);
+      }
+      else if (message.includes('Configuration') || message.includes('Application') || message.includes('initialization')) {
+        const output = `⚙️ ${message}`;
+        this.captureOutput(output);
+      }
+      
       // Error Events
       else if (level === 'error' && message.includes('Error')) {
         const output = `❌ ${message}`;
@@ -286,6 +312,76 @@ describe('Enhanced Logger - Output Capture Tests', () => {
       });
 
       expect(logger.getLastOutput()).toBe(`📝 [${mockTimestamp}] POST /tools/make-reservation`);
+    });
+  });
+
+  describe('Server Startup Events', () => {
+    it('should enhance server startup messages', () => {
+      logger.info('Starting Twilio Ultravox Agent Server...');
+      expect(logger.getLastOutput()).toBe('🚀 Starting Twilio Ultravox Agent Server...');
+    });
+
+    it('should enhance server started messages', () => {
+      logger.info('Server started successfully');
+      expect(logger.getLastOutput()).toBe('🚀 Server started successfully');
+    });
+
+    it('should enhance application started messages', () => {
+      logger.info('Restaurant Voice Agent Server started successfully');
+      expect(logger.getLastOutput()).toBe('🚀 Restaurant Voice Agent Server started successfully');
+    });
+  });
+
+  describe('Database Events', () => {
+    it('should enhance database connection messages', () => {
+      logger.info('Connecting to database at pgvector-astrotope.sliplane.app:5432...');
+      expect(logger.getLastOutput()).toBe('🗄️ Connecting to database at pgvector-astrotope.sliplane.app:5432...');
+    });
+
+    it('should enhance database established messages', () => {
+      logger.info('Database connection established');
+      expect(logger.getLastOutput()).toBe('🗄️ Database connection established');
+    });
+  });
+
+  describe('Configuration Events', () => {
+    it('should enhance configuration messages', () => {
+      logger.info('Configuration validated');
+      expect(logger.getLastOutput()).toBe('⚙️ Configuration validated');
+    });
+
+    it('should enhance application initialization messages', () => {
+      logger.info('Application initialization complete');
+      expect(logger.getLastOutput()).toBe('⚙️ Application initialization complete');
+    });
+  });
+
+  describe('Migration Events', () => {
+    it('should enhance database migration messages', () => {
+      logger.info('Running database migrations...');
+      expect(logger.getLastOutput()).toBe('🔄 Running database migrations...');
+    });
+
+    it('should enhance migration completed messages', () => {
+      logger.info('Database migrations completed');
+      expect(logger.getLastOutput()).toBe('🔄 Database migrations completed');
+    });
+  });
+
+  describe('Shutdown Events', () => {
+    it('should enhance graceful shutdown messages', () => {
+      logger.info('Starting graceful shutdown sequence due to SIGTERM');
+      expect(logger.getLastOutput()).toBe('🔄 Starting graceful shutdown sequence due to SIGTERM');
+    });
+
+    it('should enhance shutdown completion messages', () => {
+      logger.info('Graceful shutdown completed successfully');
+      expect(logger.getLastOutput()).toBe('🔄 Graceful shutdown completed successfully');
+    });
+
+    it('should enhance SIGTERM messages', () => {
+      logger.info('Received SIGTERM, initiating graceful shutdown');
+      expect(logger.getLastOutput()).toBe('🔄 Received SIGTERM, initiating graceful shutdown');
     });
   });
 

@@ -320,6 +320,26 @@ class EnhancedLoggerWrapper {
         }
       }
       
+      // Server startup and database events - order matters for pattern matching
+      else if (message.includes('Migration') || message.includes('migration')) {
+        console.log(chalk.cyan(`🔄 ${message}`));
+      }
+      else if (message.includes('shutdown') || message.includes('SIGTERM') || message.includes('Graceful')) {
+        console.log(chalk.yellow(`🔄 ${message}`));
+      }
+      else if (message.includes('Starting') && message.includes('shutdown')) {
+        console.log(chalk.yellow(`🔄 ${message}`));
+      }
+      else if (message.includes('Starting') || message.includes('Server started') || message.includes('started successfully')) {
+        console.log(chalk.green(`🚀 ${message}`));
+      }
+      else if (message.includes('Database') || message.includes('database') || message.includes('Connecting to')) {
+        console.log(chalk.blue(`🗄️ ${message}`));
+      }
+      else if (message.includes('Configuration') || message.includes('Application') || message.includes('initialization')) {
+        console.log(chalk.yellow(`⚙️ ${message}`));
+      }
+      
       // Error Events
       else if (level === 'error' && message.includes('Error')) {
         console.log(chalk.red(`❌ ${message}`));
