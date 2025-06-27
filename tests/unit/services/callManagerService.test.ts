@@ -8,6 +8,18 @@ jest.mock('../../../src/config', () => ({
   })
 }));
 
+// Mock the logger to prevent JSON output
+jest.mock('../../../src/utils/logger', () => ({
+  logger: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    http: jest.fn(),
+    log: jest.fn()
+  }
+}));
+
 describe('CallManagerService', () => {
   let callManager: CallManagerService;
 
@@ -17,7 +29,8 @@ describe('CallManagerService', () => {
   });
 
   afterEach(() => {
-    // Clean up any remaining calls
+    // Clean up any remaining calls and timeouts
+    callManager.clearAllTimeouts();
     callManager.getActiveCalls().clear();
   });
 

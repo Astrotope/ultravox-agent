@@ -5,6 +5,7 @@ import { logger } from './logger';
 export interface ShutdownOptions {
   timeout?: number; // Maximum time to wait for graceful shutdown (ms)
   signals?: string[]; // Process signals to listen for
+  exitFn?: (code: number) => void; // Exit function (for testing)
 }
 
 export class GracefulShutdown {
@@ -13,6 +14,7 @@ export class GracefulShutdown {
   private isShuttingDown = false;
   private timeout: number;
   private signals: string[];
+  private exitFn: (code: number) => void;
 
   constructor(
     server: Server,
@@ -23,6 +25,7 @@ export class GracefulShutdown {
     this.prisma = prisma;
     this.timeout = options.timeout || 30000; // 30 seconds default
     this.signals = options.signals || ['SIGTERM', 'SIGINT'];
+    this.exitFn = options.exitFn || process.exit;
 
     this.setupSignalHandlers();
     this.setupExceptionHandlers();
@@ -68,7 +71,7 @@ export class GracefulShutdown {
     // Set a timeout for forced shutdown
     const forceShutdownTimeout = setTimeout(() => {
       logger.error('Graceful shutdown timeout exceeded, forcing exit');
-      process.exit(1);
+      this.exitFn(1);
     }, this.timeout);
 
     try {
@@ -90,13 +93,13 @@ export class GracefulShutdown {
 
           logger.info('Graceful shutdown completed successfully');
           clearTimeout(forceShutdownTimeout);
-          process.exit(0);
+          this.exitFn(0);
         } catch (cleanupError) {
           logger.error('Error during cleanup', { 
             error: cleanupError instanceof Error ? cleanupError.message : cleanupError 
           });
           clearTimeout(forceShutdownTimeout);
-          process.exit(1);
+          this.exitFn(1);
         }
       });
     } catch (error) {
@@ -104,7 +107,7 @@ export class GracefulShutdown {
         error: error instanceof Error ? error.message : error
       });
       clearTimeout(forceShutdownTimeout);
-      process.exit(1);
+      this.exitFn(1);
     }
   }
 

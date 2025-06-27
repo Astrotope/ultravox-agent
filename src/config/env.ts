@@ -26,7 +26,7 @@ const envSchema = z.object({
   AGENT_NAME: z.string().default('Sofia'),
   
   // Logging
-  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info')
+  LOG_LEVEL: z.enum(['silent', 'error', 'warn', 'info', 'debug']).default('info')
 });
 
 export type Config = z.infer<typeof envSchema>;

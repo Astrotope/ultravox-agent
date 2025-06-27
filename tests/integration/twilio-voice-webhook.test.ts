@@ -1,12 +1,21 @@
 import request from 'supertest';
 import { createApp } from '../../src/app';
 import { Application } from 'express';
+import { disconnectDatabase } from '../../src/config/database';
 
 describe('Twilio Voice Webhook Integration', () => {
   let app: Application;
 
   beforeAll(async () => {
     app = await createApp();
+  });
+
+  afterAll(async () => {
+    // Close database connections and wait longer for cleanup
+    await disconnectDatabase();
+    
+    // Give more time for all connections to close (common pattern from research)
+    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
   describe('POST /api/v1/webhook/twilio/voice', () => {
@@ -91,6 +100,7 @@ describe('Twilio Voice Webhook Integration', () => {
       };
 
       // Voice webhook should return XML
+      await Promise.resolve(process.nextTick(Boolean)); // Workaround for TLSWRAP issue
       const voiceResponse = await request(app)
         .post('/api/v1/webhook/twilio/voice')
         .send(webhookData)

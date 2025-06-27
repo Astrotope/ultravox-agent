@@ -24,11 +24,15 @@ describe('GracefulShutdown', () => {
   let gracefulShutdown: GracefulShutdown;
   let originalProcessOn: typeof process.on;
   let processEventHandlers: { [key: string]: Function } = {};
+  let mockExit: jest.Mock;
 
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
     processEventHandlers = {};
+
+    // Create mock exit function
+    mockExit = jest.fn();
 
     // Mock process.on to capture event handlers
     originalProcessOn = process.on;
@@ -50,7 +54,8 @@ describe('GracefulShutdown', () => {
 
     gracefulShutdown = new GracefulShutdown(mockServer, mockPrisma, {
       timeout: 1000, // Short timeout for testing
-      signals: ['SIGTERM', 'SIGINT']
+      signals: ['SIGTERM', 'SIGINT'],
+      exitFn: mockExit // Use mock exit function
     });
   });
 
@@ -84,32 +89,22 @@ describe('GracefulShutdown', () => {
 
   describe('Shutdown Process', () => {
     it('should perform graceful shutdown when SIGTERM is received', async () => {
-      // Mock process.exit to prevent actual exit
-      const originalExit = process.exit;
-      process.exit = jest.fn() as any;
+      // Trigger SIGTERM handler
+      const sigTermHandler = processEventHandlers['SIGTERM'];
+      expect(sigTermHandler).toBeDefined();
 
-      try {
-        // Trigger SIGTERM handler
-        const sigTermHandler = processEventHandlers['SIGTERM'];
-        expect(sigTermHandler).toBeDefined();
+      // Execute shutdown
+      sigTermHandler();
 
-        // Execute shutdown
-        const shutdownPromise = sigTermHandler();
+      // Wait for async operations to complete
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-        // Wait a bit for async operations
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        expect(mockServer.close).toHaveBeenCalled();
-        expect(mockPrisma.$disconnect).toHaveBeenCalled();
-        expect(process.exit).toHaveBeenCalledWith(0);
-      } finally {
-        process.exit = originalExit;
-      }
+      expect(mockServer.close).toHaveBeenCalled();
+      expect(mockPrisma.$disconnect).toHaveBeenCalled();
+      expect(mockExit).toHaveBeenCalledWith(0);
     });
 
     it('should handle server close errors gracefully', async () => {
-      const originalExit = process.exit;
-      process.exit = jest.fn() as any;
 
       // Mock server.close to call callback with error
       (mockServer.close as jest.Mock).mockImplementation((callback: Function) => {
@@ -118,43 +113,30 @@ describe('GracefulShutdown', () => {
         }
       });
 
-      try {
-        const sigTermHandler = processEventHandlers['SIGTERM'];
-        sigTermHandler();
+      const sigTermHandler = processEventHandlers['SIGTERM'];
+      sigTermHandler();
 
-        await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-        // Should exit with error code (0 or 1 depending on error handling)
-        expect(process.exit).toHaveBeenCalledWith(expect.any(Number));
-      } finally {
-        process.exit = originalExit;
-      }
+      // Should exit with error code (0 or 1 depending on error handling)
+      expect(mockExit).toHaveBeenCalledWith(expect.any(Number));
     });
 
     it('should handle database disconnect errors', async () => {
-      const originalExit = process.exit;
-      process.exit = jest.fn() as any;
 
       // Mock Prisma disconnect to reject
       (mockPrisma.$disconnect as jest.Mock).mockRejectedValue(new Error('Database disconnect error'));
 
-      try {
-        const sigTermHandler = processEventHandlers['SIGTERM'];
-        sigTermHandler();
+      const sigTermHandler = processEventHandlers['SIGTERM'];
+      sigTermHandler();
 
-        await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-        expect(process.exit).toHaveBeenCalledWith(1);
-      } finally {
-        process.exit = originalExit;
-      }
+      expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should force shutdown if timeout is exceeded', async () => {
-      const originalExit = process.exit;
       const originalSetTimeout = global.setTimeout;
-      
-      process.exit = jest.fn() as any;
 
       // Mock setTimeout to call the timeout callback immediately
       const mockSetTimeout = jest.fn((callback: Function, delay: number) => {
@@ -165,42 +147,31 @@ describe('GracefulShutdown', () => {
       }) as any;
       global.setTimeout = mockSetTimeout;
 
-      try {
-        const sigTermHandler = processEventHandlers['SIGTERM'];
-        sigTermHandler();
+      const sigTermHandler = processEventHandlers['SIGTERM'];
+      sigTermHandler();
 
-        expect(process.exit).toHaveBeenCalledWith(1);
-      } finally {
-        process.exit = originalExit;
-        global.setTimeout = originalSetTimeout;
-      }
+      expect(mockExit).toHaveBeenCalledWith(1);
+      
+      // Restore setTimeout
+      global.setTimeout = originalSetTimeout;
     });
   });
 
   describe('Exception Handling', () => {
     it('should handle uncaught exceptions', () => {
-      const originalExit = process.exit;
-      process.exit = jest.fn() as any;
 
-      try {
-        const uncaughtHandler = processEventHandlers['uncaughtException'];
-        expect(uncaughtHandler).toBeDefined();
+      const uncaughtHandler = processEventHandlers['uncaughtException'];
+      expect(uncaughtHandler).toBeDefined();
 
-        const testError = new Error('Test uncaught exception');
-        uncaughtHandler(testError);
+      const testError = new Error('Test uncaught exception');
+      uncaughtHandler(testError);
 
-        // Should initiate shutdown process
-        expect(gracefulShutdown.isShutdownInProgress()).toBe(true);
-      } finally {
-        process.exit = originalExit;
-      }
+      // Should initiate shutdown process
+      expect(gracefulShutdown.isShutdownInProgress()).toBe(true);
     });
 
     it('should handle unhandled rejections', () => {
-      const originalExit = process.exit;
-      process.exit = jest.fn() as any;
 
-      try {
         const unhandledHandler = processEventHandlers['unhandledRejection'];
         expect(unhandledHandler).toBeDefined();
 
@@ -209,9 +180,6 @@ describe('GracefulShutdown', () => {
         unhandledHandler(testReason, testPromise);
 
         expect(gracefulShutdown.isShutdownInProgress()).toBe(true);
-      } finally {
-        process.exit = originalExit;
-      }
     });
   });
 
@@ -228,24 +196,15 @@ describe('GracefulShutdown', () => {
     });
 
     it('should support manual shutdown', async () => {
-      const originalExit = process.exit;
-      process.exit = jest.fn() as any;
 
-      try {
         await gracefulShutdown.manualShutdown();
         expect(gracefulShutdown.isShutdownInProgress()).toBe(true);
-      } finally {
-        process.exit = originalExit;
-      }
     });
   });
 
   describe('Multiple Signal Handling', () => {
     it('should ignore additional signals during shutdown', () => {
-      const originalExit = process.exit;
-      process.exit = jest.fn() as any;
 
-      try {
         const sigTermHandler = processEventHandlers['SIGTERM'];
         
         // First signal should start shutdown
@@ -260,9 +219,6 @@ describe('GracefulShutdown', () => {
         
         // Server.close should not be called again
         expect(mockServer.close).not.toHaveBeenCalled();
-      } finally {
-        process.exit = originalExit;
-      }
     });
   });
 });

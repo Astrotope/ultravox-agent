@@ -20,10 +20,11 @@ module.exports = {
   testTimeout: 15000,
   maxWorkers: 1, // Important for database tests
   forceExit: true,
+  detectOpenHandles: true, // Temporarily disable to avoid TLSWRAP warnings
+  openHandlesTimeout: 0, // Disable "Force exiting Jest" warning
   clearMocks: true,
   resetMocks: true,
   restoreMocks: true,
-  detectOpenHandles: true,
   // More aggressive cleanup
   errorOnDeprecated: false
 };

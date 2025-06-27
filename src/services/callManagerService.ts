@@ -15,6 +15,7 @@ export class CallManagerService {
   private events = new EventEmitter();
   private maxConcurrentCalls: number;
   private callCleanupInterval: number;
+  private cleanupTimeouts = new Map<string, NodeJS.Timeout>(); // Track timeouts for cleanup
 
   constructor() {
     const config = getConfig();
@@ -149,13 +150,17 @@ export class CallManagerService {
       
       // Schedule removal after retention period
       const CALL_RETENTION_TIME = 30000; // 30 seconds
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         this.activeCalls.delete(callId);
+        this.cleanupTimeouts.delete(callId);
         logger.debug('Call record removed from memory', {
           callId,
           retentionTime: CALL_RETENTION_TIME
         });
       }, CALL_RETENTION_TIME);
+      
+      // Store timeout reference for cleanup
+      this.cleanupTimeouts.set(callId, timeoutId);
       
       this.events.emit('callEnded', callId, reason);
       
@@ -263,5 +268,15 @@ export class CallManagerService {
    */
   getMaxConcurrentCalls(): number {
     return this.maxConcurrentCalls;
+  }
+
+  /**
+   * Clear all pending cleanup timeouts (for testing)
+   */
+  clearAllTimeouts(): void {
+    this.cleanupTimeouts.forEach((timeoutId) => {
+      clearTimeout(timeoutId);
+    });
+    this.cleanupTimeouts.clear();
   }
 }
