@@ -37,3 +37,8 @@
   * Structured logging with Winston and correlation IDs
   * Rate limiting and request timeout handling
   * Complete modular refactoring for maintainability
+- Established core testing discipline:
+  * Anytime we change code, we need to run all the tests
+  * Anytime we add new code, we need to add new tests to exercise the code, and make sure they pass
+  * After adding new tests, run the full test suite to ensure no existing functionality is broken
+- Make sure when changing code, specific tests pass first, before running the complete test suite

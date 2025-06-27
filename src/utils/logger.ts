@@ -1,5 +1,6 @@
 import winston from 'winston';
 import path from 'path';
+import chalk from 'chalk';
 import { getConfig } from '../config';
 
 // Define log levels
@@ -207,8 +208,169 @@ export class Logger {
   }
 }
 
-// Export the singleton logger instance
-export const logger = Logger.getInstance();
+// Enhanced Logger Wrapper with backwards compatibility
+class EnhancedLoggerWrapper {
+  private winston: winston.Logger;
+
+  constructor(winstonInstance: winston.Logger) {
+    this.winston = winstonInstance;
+  }
+
+  // Backwards compatible Winston methods
+  info(message: string, meta?: any) {
+    this.winston.info(message, meta);
+    this.enhanceConsoleOutput('info', message, meta);
+  }
+
+  error(message: string, meta?: any) {
+    this.winston.error(message, meta);
+    this.enhanceConsoleOutput('error', message, meta);
+  }
+
+  warn(message: string, meta?: any) {
+    this.winston.warn(message, meta);
+    this.enhanceConsoleOutput('warn', message, meta);
+  }
+
+  debug(message: string, meta?: any) {
+    this.winston.debug(message, meta);
+    this.enhanceConsoleOutput('debug', message, meta);
+  }
+
+  http(message: string, meta?: any) {
+    this.winston.http(message, meta);
+    this.enhanceConsoleOutput('http', message, meta);
+  }
+
+  log(level: string, message: string, meta?: any) {
+    this.winston.log(level, message, meta);
+    this.enhanceConsoleOutput(level, message, meta);
+  }
+
+  // Enhanced console output with emojis and colors
+  private enhanceConsoleOutput(level: string, message: string, meta?: any) {
+    if (!this.shouldEnhanceConsole()) return;
+
+    try {
+      // Call management events (actual patterns from callManagerService)
+      if (message.includes('Call slot') || message.includes('capacity limit')) {
+        const emoji = level === 'warn' ? '⚠️' : '📞';
+        console.log(chalk.green(`${emoji} ${message}`));
+        if (this.isDebugMode() && meta) {
+          console.log(chalk.gray(`   📊 Metrics: ${JSON.stringify(meta, null, 2)}`));
+        }
+      }
+      
+      // Booking events (actual patterns from bookingService)
+      else if (message.includes('Booking') && (message.includes('Event') || message.includes('operation') || message.includes('created') || message.includes('cancelled'))) {
+        console.log(chalk.blue(`🏷️ ${message}`));
+        if (this.isDebugMode() && meta) {
+          console.log(chalk.gray(`   📝 Details: ${JSON.stringify(meta, null, 2)}`));
+        }
+      }
+      
+      // Tool Events
+      else if ((message.includes('Tool:') || message.includes('Checking availability') || message.includes('Making reservation')) && meta) {
+        const toolName = this.extractToolName(message, meta);
+        const timestamp = chalk.gray(`[${new Date().toISOString()}]`);
+        console.log(chalk.blue(`🔧 ${timestamp} ${toolName} called`));
+        
+        // Debug mode request details
+        if (this.isDebugMode() && meta && Object.keys(meta).length > 1) {
+          const sanitizedMeta = { ...meta };
+          delete sanitizedMeta.correlationId;
+          console.log(chalk.gray(`   📥 Request: ${JSON.stringify(sanitizedMeta, null, 2)}`));
+        }
+      }
+      
+      // Tool completion/results
+      else if (message.includes('completed') && meta?.available !== undefined) {
+        const resultMsg = `   ✅ Response: ${meta.available ? 'Available' : 'Not available'}`;
+        console.log(chalk.green(resultMsg));
+        
+        if (this.isDebugMode() && meta) {
+          const sanitizedMeta = { ...meta };
+          delete sanitizedMeta.correlationId;
+          console.log(chalk.gray(`   📤 Full Response: ${JSON.stringify(sanitizedMeta, null, 2)}`));
+        }
+      }
+      
+      // HTTP Requests
+      else if (message.includes('Request Started') && meta?.method && meta?.url) {
+        const emoji = this.getMethodEmoji(meta.method);
+        const timestamp = chalk.gray(`[${meta.timestamp || new Date().toISOString()}]`);
+        const method = chalk.yellow(meta.method);
+        const url = chalk.cyan(meta.url);
+        console.log(`${emoji} ${timestamp} ${method} ${url}`);
+      }
+      
+      // Test Events
+      else if (message.includes('Test') || message.includes('test')) {
+        console.log(chalk.magenta(`🧪 ${message}`));
+        if (this.isDebugMode() && meta) {
+          console.log(chalk.gray(`   ${JSON.stringify(meta, null, 2)}`));
+        }
+      }
+      
+      // Webhook Events
+      else if (message.includes('webhook') || message.includes('Webhook')) {
+        console.log(chalk.magenta(`🔗 Webhook: ${meta?.event || message}`));
+        if (this.isDebugMode() && meta) {
+          console.log(chalk.gray(`   📡 Payload: ${JSON.stringify(meta, null, 2)}`));
+        }
+      }
+      
+      // Error Events
+      else if (level === 'error' && message.includes('Error')) {
+        console.log(chalk.red(`❌ ${message}`));
+        if (meta?.stack && this.isDebugMode()) {
+          console.log(chalk.red(`   ${meta.stack}`));
+        }
+      }
+      
+    } catch (enhanceError) {
+      // If enhancement fails, don't break logging
+      console.error('Logger enhancement error:', enhanceError);
+    }
+  }
+
+  private shouldEnhanceConsole(): boolean {
+    return process.env.RICH_CONSOLE_LOGGING !== 'false' && 
+           process.env.NODE_ENV !== 'test';
+  }
+
+  private isDebugMode(): boolean {
+    const config = getConfig();
+    return config.LOG_LEVEL === 'debug';
+  }
+
+  private getMethodEmoji(method: string): string {
+    const emojis: Record<string, string> = {
+      'GET': '🌐',
+      'POST': '📝', 
+      'PUT': '🔄',
+      'DELETE': '🗑️',
+      'PATCH': '✏️'
+    };
+    return emojis[method.toUpperCase()] || '📡';
+  }
+
+  private extractToolName(message: string, meta?: any): string {
+    if (meta?.toolName) return meta.toolName;
+    if (message.includes('check-availability') || message.includes('Checking availability')) return 'check-availability';
+    if (message.includes('make-reservation') || message.includes('Making reservation')) return 'make-reservation';
+    if (message.includes('modify-reservation')) return 'modify-reservation';
+    if (message.includes('cancel-reservation')) return 'cancel-reservation';
+    if (message.includes('get-booking-details') || message.includes('check-booking')) return 'get-booking-details';
+    if (message.includes('daily-specials')) return 'daily-specials';
+    if (message.includes('opening-hours')) return 'opening-hours';
+    if (message.includes('transfer-call')) return 'transfer-call';
+    return 'unknown-tool';
+  }
+}
+
+// Export the enhanced logger instance (backwards compatible)
+export const logger = new EnhancedLoggerWrapper(Logger.getInstance());
 
 // Export individual log methods for convenience
 export const logRequest = Logger.logRequest;
